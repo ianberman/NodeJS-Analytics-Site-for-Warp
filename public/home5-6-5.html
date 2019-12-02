@@ -1,0 +1,361 @@
+<html>
+  <head>
+    <!-- LOAD JQUERY -->
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.js"
+      integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60="
+      crossorigin="anonymous">
+    </script>
+
+    <!-- date conversion library -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.24.0/moment.min.js"></script>
+
+    <!-- Load c3.css -->
+    <link href="/scripts/c3.css" rel="stylesheet" type="text/css">
+    <!-- Load d3.js and c3.js -->
+    <script src="/scripts/d3.min.js" charset="utf-8"></script>
+    <script src="/scripts/c3.min.js"></script>
+
+    <!-- load twttr for embed display -->
+    <script>window.twttr = (function(d, s, id) {
+      var js, fjs = d.getElementsByTagName(s)[0],
+      t = window.twttr || {};
+      if (d.getElementById(id)) return t;
+      js = d.createElement(s);
+      js.id = id;
+      js.src = "https://platform.twitter.com/widgets.js";
+      fjs.parentNode.insertBefore(js, fjs);
+      t._e = [];
+      t.ready = function(f) {
+        t._e.push(f);
+      };
+      return t;
+      }(document, "script", "twitter-wjs"));
+    </script>
+
+    <!-- JS  -->
+    <script type="text/javascript">
+      $(document).ready(function() {
+
+        var cleanedTrendsData = [];
+
+        // SEARCH TRENDS API
+        $("#submitTrends").click(function(e) {
+          e.preventDefault();
+
+          // CREATES VARS FOR SUBMISSION DATA
+          var masterKeywordQuery = $('#masterKeyword').val();
+          var masterFromQuery = $('#masterDateFromID').val();
+          var masterToQuery = $('#masterDateToID').val();
+
+          // INITS ARRAY WITH SUBMISSION DATA TO PASS TO SERVER FOR TRENDS API
+          var trendsSubmit = [];
+          trendsSubmit.push(masterKeywordQuery);
+          trendsSubmit.push(masterFromQuery);
+          trendsSubmit.push(masterToQuery);
+
+          console.log("you submitted: " + trendsSubmit)
+
+
+
+          // AJAX CALL TO TRENDS API ON SERVER
+          $.ajax({
+            type: 'GET',
+            data: {trendsToServer: trendsSubmit},
+            url: '/trendsSub',
+            error: function() {
+              console.log("trendsdata error");
+            },
+            success: function(trendsData) {
+              // console.log("td: " + trendsData);
+              var trendsDataJSON = JSON.parse(trendsData);
+              for (var i = 0; i < trendsDataJSON.default.timelineData.length; i++) {
+                //associate two related tags of data together by creating object
+                var unformattedTime = Number(trendsDataJSON.default.timelineData[i].time);
+                // Add to account for EST
+                var timeOperator = 18000;
+                var operatedTime = unformattedTime + timeOperator;
+                var momentTime = moment.unix(operatedTime).format('YYYY-MM-DD');
+                // console.log("momenttime: " + momentTime);
+                var trendsDataPairs = {date: momentTime, value: trendsDataJSON.default.timelineData[i].formattedValue};
+                cleanedTrendsData.push(trendsDataPairs);
+              }
+
+              // GENERATES C3 CHART WITH JSON RETURN
+              var chart = c3.generate({
+                bindto: '#chart',
+                data: {
+                  json: cleanedTrendsData,
+                  keys: {
+                    value: ['value']
+                  }
+                }
+              });
+
+              // // DISPLAY TRENDS DATA OUTPUT IN DIV
+              // var cleanedTrendsDataString = JSON.stringify(cleanedTrendsData);
+              // $('#newsapioutput').html(cleanedTrendsDataString);
+
+            }
+          })
+        });
+
+        $("#submitNews").click(function(e) {
+          e.preventDefault();
+          console.log('engaged');
+
+          // CREATES VARS FOR SUBMISSION DATA
+          var masterKeywordQuery = $('#masterKeyword').val();
+          var masterFromQuery = $('#masterDateFromID').val();
+          var masterToQuery = $('#masterDateToID').val();
+          var masterSortByQuery = $('#masterSortByID').val();
+
+          // AJAX CALL TO NEWS API URL
+          $.ajax({
+            type: 'GET',
+            url: "https://newsapi.org/v2/everything?q=" + masterKeywordQuery + "&from=" + masterFromQuery + "&to=" + masterToQuery + "&sortBy=" + masterSortByQuery + "&apiKey=5cbfc5ed0e6d4d33999c46668ed794c9",
+            dataType: 'json',
+            success: function(newsdata) {
+              // DISPLAY OUTPUT IN DIV
+              // var stringdata = JSON.stringify(newsdata);
+              // $('#newsapioutput').html(stringdata);
+              $('#newsapioutput').empty();
+              for (var i = 0; i < newsdata.articles.length; i++) {
+                $('#newsapioutput').append("<div class='newsstory'> </div>");
+              }
+              var divNewsStory = document.getElementsByClassName('newsstory');
+              for (var i = 0; i < divNewsStory.length; i++) {
+                var sourceDiv = document.createElement("div");
+                sourceDiv.className = 'source';
+                sourceDiv.innerHTML = newsdata.articles[i].source.name;
+                divNewsStory[i].appendChild(sourceDiv);
+
+                var authorDiv = document.createElement("div");
+                authorDiv.className = 'author';
+                authorDiv.innerHTML = newsdata.articles[i].author;
+                divNewsStory[i].appendChild(authorDiv);
+
+                var titleDiv = document.createElement("div");
+                titleDiv.className = 'title';
+                titleDiv.innerHTML = newsdata.articles[i].title;
+                divNewsStory[i].appendChild(titleDiv);
+
+                var descriptionDiv = document.createElement("div");
+                descriptionDiv.className = 'description';
+                descriptionDiv.innerHTML = newsdata.articles[i].description;
+                divNewsStory[i].appendChild(descriptionDiv);
+
+                var dateDiv = document.createElement("div");
+                dateDiv.className = 'date';
+                var str = newsdata.articles[i].publishedAt;
+                var newStr = str.substr(0, 10);
+                dateDiv.innerHTML = newStr;
+                divNewsStory[i].appendChild(dateDiv);
+
+                var url = document.createElement("a");
+                url.className = 'url';
+                url.href = newsdata.articles[i].url;
+                url.innerHTML = "link";
+                divNewsStory[i].appendChild(url);
+
+                var imgChild = document.createElement("img");
+                imgChild.className = 'newsImg';
+                imgChild.src = newsdata.articles[i].urlToImage;
+                divNewsStory[i].appendChild(imgChild);
+              }
+            },
+            error: function() {
+              console.log("newsdata error");
+            }
+          });
+        })
+
+        // SEARCH TWITTER FULL ARCHIVE API
+        $("#submitTwitFA").click(function(e) {
+          e.preventDefault();
+          var twitFASubmit = $('#masterKeyword').val();
+          console.log(twitFASubmit);
+
+          var masterKeywordQuery = $('#masterKeyword').val();
+          var masterFromQuery = $('#masterDateFromID').val();
+          var masterFromQueryParsed = masterFromQuery.replace(/\-/g, '');
+          var masterToQuery = $('#masterDateToID').val();
+          var masterToQueryParsed = masterToQuery.replace(/\-/g, '');
+
+          var zeroedFromQuery = masterFromQueryParsed + '0000';
+          var zeroedToQuery = masterToQueryParsed + '0000';
+
+          // INITS ARRAY WITH SUBMISSION DATA TO PASS TO SERVER FOR TRENDS API
+          var FASubmit = [];
+          FASubmit.push(masterKeywordQuery);
+          FASubmit.push(zeroedFromQuery);
+          FASubmit.push(zeroedToQuery);
+
+          $.ajax({
+            type: 'GET',
+            data: {twitFAToServer: FASubmit},
+            url: '/TwitFASub',
+            success: function(TwitFAData) {
+              console.log(TwitFAData);
+              $('#tweet-container').empty();
+
+              for (var i = 0; i < TwitFAData.results.length; i ++) {
+                twttr.widgets.createTweet(
+                  TwitFAData.results[i].id_str,
+                  document.getElementById("tweet-container"),
+                  {
+                    linkColor: "55acee"
+                  }
+                );
+                var output = "https://publish.twitter.com/oembed?url=https://twitter.com/Interior/status/" + TwitFAData.results[i].id_str
+              }
+            }
+          })
+        });
+
+        // SEARCH TWITTER 30 DAY API
+        $("#submitTwit30Day").click(function(e) {
+          e.preventDefault();
+          console.log('triggered');
+
+          var twit30DaySubmit = $('#masterKeyword').val();
+          console.log(twit30DaySubmit);
+
+          $.ajax({
+            type: 'GET',
+            data: {twit30DayToServer: twit30DaySubmit},
+            url: '/Twit30DaySub',
+            success: function(Twit30DayData) {
+              $('#tweet-container').empty();
+              for (var i = 0; i < Twit30DayData.results.length; i ++) {
+                twttr.widgets.createTweet(
+                  Twit30DayData.results[i].id_str,
+                  document.getElementById("tweet-container"),
+                  {
+                    linkColor: "55acee"
+                  }
+                );
+                var output = "https://publish.twitter.com/oembed?url=https://twitter.com/Interior/status/" + Twit30DayData.results[i].id_str
+              }
+            }
+          })
+        })
+      });
+
+    </script>
+
+    <style>
+      #content-wrapper {
+        /* background: red; */
+        display: grid;
+      }
+      #newsapioutput {
+        min-width: 220px;
+        max-width: 500px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        grid-column: 1;
+        word-wrap: break-word;
+        margin: 0 auto;
+        display: block;
+      }
+      #tweet-container {
+        min-width: 220px;
+        max-width: 500px;
+        grid-column: 2;
+        display: block;
+        margin: 0 auto;
+      }
+      #chart {
+        max-width: 1000px;
+        margin-right: 30px;
+        margin: 0 auto;
+      }
+      #masterSubmit {
+        display: grid;
+      }
+      .newsstory {
+        padding-bottom: 20px;
+      }
+      .newsImg {
+        max-width: 100%;
+      }
+      .masterdiv {
+        display: grid;
+      }
+      .search-term-wrapper {
+        grid-column: 1;
+        text-align: right;
+        padding-right: 20px;
+      }
+      .submit-wrapper{
+        grid-column: 2;
+        padding-left: 20px;
+      }
+
+      #h1 {
+        font-size: 16;
+      }
+      #h2 {
+        font-size: 16;
+      }
+
+    </style>
+  </head>
+
+  <body>
+    <div class='masterdiv'>
+      <form id="masterSubmit">
+        <div class='search-term-wrapper'>
+          <h1 id="h1">Query</h1>
+          <label for='masterKeyword'>Search term:</label>
+          <br>
+          <input id="masterKeyword" type="text" name="masterInputName" placeholder="Keyword">
+          <br><br>
+          <label for="masterDateFromID">From:</label>
+          <br>
+          <input id="masterDateFromID" name="masterDateFromName" type="date">
+          <br><br>
+          <label for="masterDateToID">To:</label>
+          <br>
+          <input id="masterDateToID" name="masterDateToName" type="date">
+          <br><br>
+          <label for="masterSortByID">Sort By:</label>
+          <br>
+          <select id="masterSortByID" name="sortByName">
+            <option value="publishedAt" selected>publishedAt</option>
+            <option value="relevancy">relevancy</option>
+            <option value="popularity">popularity</option>
+          </select>
+          <br><br>
+        </div>
+        <div class='submit-wrapper'>
+          <h2 id='h2'>Submit to API</h2>
+          <label for="submitTrends">unlimited</label> <br>
+          <input type="button" id="submitTrends" value="Trends">
+          <br><br>
+          <label for="submitNews">limited to 30 days</label> <br>
+          <input type="button" id="submitNews" value="News">
+          <br><br>
+          <label for="submitTwit30Day">limited to 250/mo</label> <br>
+          <input type="button" id="submitTwit30Day" value="Twitter 30 Day">
+          <br><br>
+          <label for="submitTwitFA">limited to 50/mo</label> <br>
+          <input type="button" id="submitTwitFA" value="Twitter Full Archive">
+          <br><br>
+        </div>
+      </form>
+    </div>
+
+    <br>
+    <div id="chart"></div>
+    <br>
+
+    <div id="content-wrapper">
+      <div id="newsapioutput"></div>
+      <div id="tweet-container"></div>
+    </div>
+
+  </body>
+
+</html>
